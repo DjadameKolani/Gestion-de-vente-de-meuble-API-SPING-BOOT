@@ -1,9 +1,12 @@
 package com.example.projet_pro.repository;
 
+import com.example.projet_pro.entity.User;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.stereotype.Repository;
 
-import com.cwa.springboot_app.entity.User;
-import org.springframework.data.jpa.repository.JpaRepository;
-
-public interface UserRepository extends JpaRepository<User, Long> {
+@Repository
+public interface UserRepository extends MongoRepository<User, String> {
     User findByUsername(String username);
+
+    User findByEmail(String email);    // ← ajouté
 }
