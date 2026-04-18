@@ -15,6 +15,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -31,7 +32,6 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody User user) {
 
-        // ← vérifier que les deux mots de passe correspondent
         if (user.getPassword() == null || user.getConfirmPassword() == null) {
             return ResponseEntity.badRequest().body("Password et confirmation sont obligatoires");
         }
@@ -39,39 +39,38 @@ public class AuthController {
         if (!user.getPassword().equals(user.getConfirmPassword())) {
             return ResponseEntity.badRequest().body("Les mots de passe ne correspondent pas");
         }
-        // Vérifier email
+
         if (user.getEmail() == null || user.getEmail().isEmpty()) {
             return ResponseEntity.badRequest().body("L'email est obligatoire");
         }
 
-        // Vérifier format email
         if (!user.getEmail().matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
             return ResponseEntity.badRequest().body("Format email invalide");
         }
 
-        // Vérifier email unique
         if (userRepository.findByEmail(user.getEmail()) != null) {
             return ResponseEntity.badRequest().body("Email déjà utilisé");
         }
-
 
         if (user.getPrenom() == null || user.getPrenom().isEmpty()) {
             return ResponseEntity.badRequest().body("Le prénom est obligatoire");
         }
 
-        // ← vérifier username unique
         if (userRepository.findByUsername(user.getUsername()) != null) {
             return ResponseEntity.badRequest().body("Username déjà utilisé");
         }
 
-        // ← ne pas sauvegarder confirmPassword en base
+        // Rôle valide parmi les 3 autorisés, sinon ROLE_USER par défaut
+        List<String> rolesAutorises = List.of("ROLE_USER", "ROLE_EXPERT", "ROLE_ADMIN");
+        if (user.getRole() == null || !rolesAutorises.contains(user.getRole())) {
+            user.setRole("ROLE_USER");
+        }
+
         user.setConfirmPassword(null);
         user.setPassword(passwordEncoder.encode(user.getPassword()));
-        user.setRole("ROLE_USER");
 
         return ResponseEntity.status(HttpStatus.CREATED).body(userRepository.save(user));
     }
-
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody User user) {
@@ -82,14 +81,20 @@ public class AuthController {
                             user.getPassword()
                     )
             );
+
             if (authentication.isAuthenticated()) {
+                User userFromDb = userRepository.findByUsername(user.getUsername());
+
                 Map<String, Object> authData = new HashMap<>();
-                authData.put("token", jwtUtils.generateToken(user.getUsername()));
+                authData.put("token", jwtUtils.generateToken(user.getUsername(), userFromDb.getRole()));
                 authData.put("type", "Bearer");
+                authData.put("role", userFromDb.getRole());
                 return ResponseEntity.ok(authData);
             }
+
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body("Invalid username or password");
+
         } catch (AuthenticationException e) {
             log.error(e.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

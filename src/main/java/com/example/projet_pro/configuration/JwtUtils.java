@@ -23,8 +23,10 @@ public class JwtUtils {
     @Value("${app.expiration-time}")
     private long expirationTime;
 
-    public String generateToken(String username) {
+    // ← Ajout du paramètre "role"
+    public String generateToken(String username, String role) {
         Map<String, Object> claims = new HashMap<>();
+        claims.put("role", role); // ← maintenant "role" est défini
         return createToken(claims, username);
     }
 
@@ -54,6 +56,11 @@ public class JwtUtils {
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
+    }
+
+    // ← Méthode utile pour extraire le rôle depuis le token
+    public String extractRole(String token) {
+        return (String) extractAllClaims(token).get("role");
     }
 
     private Date extractExpirationDate(String token) {
